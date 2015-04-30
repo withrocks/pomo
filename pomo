@@ -1,0 +1,55 @@
+#!/usr/bin/env python
+import sys
+import os
+import json
+import datetime
+import time
+
+def get_file(mode):
+  path = os.path.expanduser("~/.pomo/current")
+  f = open(path, mode)
+  return f
+
+def start():
+  f = get_file("w")
+  config = {}
+  config["started_at"] = time.time() 
+  config["state"] = "started"
+  config["length"] = 100
+  json.dump(config, f)
+  print "Started new pomodoro (100s todo)"
+
+def end():
+  config["state"] = "stopped"
+  json.dump(config, f)
+
+def status():
+  f = get_file("r")
+  config = json.load(f)
+  state = config["state"]
+  elapsed = time.time() - config["started_at"]
+  length = config["length"]
+  left = length - elapsed
+  if state == "started":
+    
+    if left < 0:
+      print "done"
+    else:
+      print int(elapsed)
+    
+
+def main(action):
+  if action == "start":
+    start()
+  elif action == "stop":
+    end()
+  elif action == "status":
+    status()
+  else:
+    print "Unknown action '%s'" % action
+
+if len(sys.argv) > 1:
+  action = sys.argv[1]
+  main(action)
+else:
+  print "Usage: pomo start|stop|status"
