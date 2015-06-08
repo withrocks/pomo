@@ -5,19 +5,60 @@ import json
 import datetime
 import time
 
+class TimeProvider:
+  def time(self):
+     return time.time()
+
+import subprocess
+class Notifier:
+  def notify(self, caption, msg):
+    subprocess.Popen(["notify-send", caption, msg])
+
+class Pomo:
+  def __init__(self, time_provider=TimeProvider()):
+    self.time_provider = time_provider
+
+  def start_new(self, length=25*60):
+    self.length = length
+    self.state = "started"
+    self.started_at = self.time_provider.time()
+
+  def has_ended(self):
+    elapsed = self.time_provider.time() - self.started_at
+    left = self.length - elapsed
+    return left < 0
+
+  def serialized(self):
+    return { "length": self.length,
+             "state": self.state,
+             "started_at": self.started_at }
+
+  def wait(self):
+    print "Waiting for end of pomodoro - you go work, I'll notify you when done"
+    # Loop until ended
+    while True:
+      if self.has_ended():
+        break
+      time.sleep(1)
+
 def get_file(mode):
-  path = os.path.expanduser("~/.pomo/current")
+  state_postfix = ""
+  path = os.path.expanduser("~/.pomo/current" + state_postfix)
   f = open(path, mode)
   return f
 
 def start():
+  time_provider = TimeProvider()
+  pomo = Pomo(time_provider)
+  pomo.start_new()
   f = get_file("w")
-  config = {}
-  config["started_at"] = time.time() 
-  config["state"] = "started"
-  config["length"] = 100
-  json.dump(config, f)
-  print "Started new pomodoro (100s todo)"
+  f.write(json.dumps(pomo.serialized()))
+  f.write('\n')
+  f.close()
+  print "Started new pomodoro (%s seconds)" % (pomo.length)
+  pomo.wait()
+  notifier = Notifier()
+  notifier.notify("Pomodoro done", "Good job")
 
 def end():
   config["state"] = "stopped"
@@ -31,12 +72,10 @@ def status():
   length = config["length"]
   left = length - elapsed
   if state == "started":
-    
     if left < 0:
       print "done"
     else:
-      print int(elapsed)
-    
+      print int(elapsed) / 60
 
 def main(action):
   if action == "start":
